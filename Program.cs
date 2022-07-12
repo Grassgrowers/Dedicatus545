@@ -4,12 +4,27 @@ using static AssetIndex;
 
 // 31049740.blk
 var assetIndexPath = @"I:\git\YuanShen\asset-indexes\OSREL2.8.0\release_external_asset_index.bin";
+var mappedNamePath = @"I:\git\YuanShen\asset-indexes\OSREL2.8.0\mapped_name.json";
 var targetPath = @"I:\git\YuanShen\asset-indexes\OSREL2.8.0\GenshinImpact_2.8.0.zip_31049740.blk.asset_index.json";
 
-LoadAssetIndex(assetIndexPath, targetPath);
+LoadAssetIndex(assetIndexPath, mappedNamePath, targetPath);
 
-static void LoadAssetIndex(string assetIndexPath, string targetPath)
+static void LoadAssetIndex(string assetIndexPath, string mappedNamePath, string targetPath)
 {
+    var mappedName = new Dictionary<uint, Dictionary<uint, string>>();
+
+    using (FileStream stream = File.OpenRead(mappedNamePath))
+    {
+        var bytes = new byte[stream.Length];
+        var count = stream.Read(bytes, 0, bytes.Length);
+
+        if (count != bytes.Length)
+            throw new Exception("Error While Reading Mapped Name");
+
+        var jsonString = Encoding.UTF8.GetString(bytes);
+        mappedName = JsonSerializer.Deserialize<Dictionary<uint, Dictionary<uint, string>>>(jsonString);
+    }
+
     var assetIndexStream = new FileStream(assetIndexPath, FileMode.Open);
 
     using (BinaryReader reader = new BinaryReader(assetIndexStream))
@@ -24,7 +39,7 @@ static void LoadAssetIndex(string assetIndexPath, string targetPath)
         var sortList = new List<uint>();
 
         typeDict = LoadTypes(reader);
-        subAssetDict = LoadSubAssets(reader);
+        subAssetDict = LoadSubAssets(reader, mappedName);
         dependenciesDict = LoadDependencies(reader);
         preloadBlocksList = LoadPreloadBlocks(reader);
         preloadShaderBlocksList = LoadPreloadShaderBlocks(reader);
@@ -67,9 +82,10 @@ static Dictionary<string, string> LoadTypes(BinaryReader reader)
     return typeDict;
 }
 
-static Dictionary<uint, List<SubAssetInfo>> LoadSubAssets(BinaryReader reader)
+static Dictionary<uint, List<SubAssetInfo>> LoadSubAssets(BinaryReader reader, Dictionary<uint, Dictionary<uint, string>> mappedName)
 {
     var subAssetDict = new Dictionary<uint, List<SubAssetInfo>>();
+    // var subAssetHashDict = new Dictionary<uint, Dictionary<uint, string>>();
 
     var subAssetsCount = reader.ReadUInt32();
     Console.WriteLine("subAssetsCount: {0}", subAssetsCount);
@@ -84,7 +100,15 @@ static Dictionary<uint, List<SubAssetInfo>> LoadSubAssets(BinaryReader reader)
         if (magic[3] == 2)
             reader.ReadBytes(5);
 
-        var subAssetInfo = new SubAssetInfo { Name = "", PathHashPre = pathHashPre, PathHashLast = pathHashLast };
+        var name = mappedName.ContainsKey(pathHashPre) ?
+            (mappedName[pathHashPre].ContainsKey(pathHashLast) ? mappedName[pathHashPre][pathHashLast] : "") : "";
+
+        var subAssetInfo = new SubAssetInfo
+        {
+            Name = name,
+            PathHashPre = pathHashPre,
+            PathHashLast = pathHashLast
+        };
         var subAssetList = new List<SubAssetInfo> { subAssetInfo };
 
         if (subAssetDict.ContainsKey(subAssetId))
@@ -92,7 +116,17 @@ static Dictionary<uint, List<SubAssetInfo>> LoadSubAssets(BinaryReader reader)
 
         // Console.WriteLine("subAssetId={0} pathHashPre={1} pathHashLast={2}", subAssetId, pathHashPre, pathHashLast);
         subAssetDict[subAssetId] = subAssetList;
+
+        // var hashInfo = new Dictionary<uint, string>() { { pathHashLast, "" } };
+
+        // if (subAssetHashDict.ContainsKey(pathHashPre))
+        //    hashInfo = hashInfo.Concat(subAssetHashDict[pathHashPre]).ToDictionary(k => k.Key, v => v.Value);
+
+        // subAssetHashDict[pathHashPre] = hashInfo;
     }
+
+    // var jsonString = JsonSerializer.Serialize(subAssetHashDict, new JsonSerializerOptions { WriteIndented = true });
+    // File.WriteAllText(@"I:\git\YuanShen\asset-indexes\OSREL2.8.0\unmapped_name.json", jsonString);
 
     return subAssetDict;
 }
