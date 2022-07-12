@@ -2,11 +2,9 @@
 using System.Text.Json;
 using static AssetIndex;
 
-// @TODO support 2.8 version
-
 // 31049740.blk
-var assetIndexPath = @"I:\git\YuanShen\asset-indexes\OSREL2.7.0\release_external_asset_index.bin";
-var targetPath = @"I:\git\YuanShen\asset-indexes\OSREL2.7.0\GenshinImpact_2.7.0.zip_31049740.blk.asset_index.json";
+var assetIndexPath = @"I:\git\YuanShen\asset-indexes\OSREL2.8.0\release_external_asset_index.bin";
+var targetPath = @"I:\git\YuanShen\asset-indexes\OSREL2.8.0\GenshinImpact_2.8.0.zip_31049740.blk.asset_index.json";
 
 LoadAssetIndex(assetIndexPath, targetPath);
 
@@ -21,7 +19,7 @@ static void LoadAssetIndex(string assetIndexPath, string targetPath)
         var dependenciesDict = new Dictionary<uint, List<uint>>();
         var preloadBlocksList = new List<uint>();
         var preloadShaderBlocksList = new List<uint>();
-        var langDict = new Dictionary<uint, uint>();
+        var blockGroupsDict = new Dictionary<uint, uint>();
         var assetsDict = new Dictionary<uint, BlockInfo>();
         var sortList = new List<uint>();
 
@@ -30,8 +28,8 @@ static void LoadAssetIndex(string assetIndexPath, string targetPath)
         dependenciesDict = LoadDependencies(reader);
         preloadBlocksList = LoadPreloadBlocks(reader);
         preloadShaderBlocksList = LoadPreloadShaderBlocks(reader);
-        langDict = LoadLangDict(reader);
-        assetsDict = LoadAssets(reader, langDict);
+        blockGroupsDict = LoadBlockGroups(reader);
+        assetsDict = LoadAssets(reader, blockGroupsDict);
         sortList = LoadSortList(reader);
 
         var assetIndex = new AssetIndex()
@@ -78,10 +76,13 @@ static Dictionary<uint, List<SubAssetInfo>> LoadSubAssets(BinaryReader reader)
 
     for (int i = 0; i < subAssetsCount; i++)
     {
-        var subAssetId = reader.ReadUInt32();
         var pathHashPre = reader.ReadByte(); // Uint8
         var pathHashLast = reader.ReadUInt32();
-        var unk = reader.ReadBytes(7);
+        var magic = reader.ReadBytes(5); // 00 00 00 ? 00
+        var subAssetId = reader.ReadUInt32();
+
+        if (magic[3] == 2)
+            reader.ReadBytes(5);
 
         var subAssetInfo = new SubAssetInfo { Name = "", PathHashPre = pathHashPre, PathHashLast = pathHashLast };
         var subAssetList = new List<SubAssetInfo> { subAssetInfo };
@@ -89,8 +90,8 @@ static Dictionary<uint, List<SubAssetInfo>> LoadSubAssets(BinaryReader reader)
         if (subAssetDict.ContainsKey(subAssetId))
             subAssetList.AddRange(subAssetDict[subAssetId]);
 
-        subAssetDict[subAssetId] = subAssetList;
         // Console.WriteLine("subAssetId={0} pathHashPre={1} pathHashLast={2}", subAssetId, pathHashPre, pathHashLast);
+        subAssetDict[subAssetId] = subAssetList;
     }
 
     return subAssetDict;
@@ -105,15 +106,15 @@ static Dictionary<uint, List<uint>> LoadDependencies(BinaryReader reader)
 
     for (int i = 0; i < dependenciesCount; i++)
     {
-        var dependencyKey = reader.ReadUInt32();
-        var dependencyCount = reader.ReadUInt32();
-        var dependencyValue = new List<uint>();
+        var assetId = reader.ReadUInt32();
+        var dependenciesListLength = reader.ReadUInt32();
+        var dependenciesList = new List<uint>();
 
-        for (int j = 0; j < dependencyCount; j++)
-            dependencyValue.Add(reader.ReadUInt32());
+        for (int j = 0; j < dependenciesListLength; j++)
+            dependenciesList.Add(reader.ReadUInt32());
 
-        dependenciesDict.Add(dependencyKey, dependencyValue);
-        // Console.WriteLine("{0} {1} {2}", dependencyKey, dependencyCount, JsonSerializer.Serialize(dependencyValue));
+        dependenciesDict.Add(assetId, dependenciesList);
+        // Console.WriteLine("assetId={0} dependenciesListLength={1} dependenciesList={2}", assetId, dependenciesListLength, JsonSerializer.Serialize(dependenciesList));
     }
 
     return dependenciesDict;
@@ -149,51 +150,57 @@ static List<uint> LoadPreloadShaderBlocks(BinaryReader reader)
     return preloadShaderBlocks;
 }
 
-static Dictionary<uint, uint> LoadLangDict(BinaryReader reader)
+static Dictionary<uint, uint> LoadBlockGroups(BinaryReader reader)
 {
-    var langDict = new Dictionary<uint, uint>(); // blockId -> langId
+    var blockGroups = new Dictionary<uint, uint>(); // blockId -> groupId
 
-    var langCount = reader.ReadUInt32();
-    for (int i = 0; i < langCount; i++)
+    var blockGroupCount = reader.ReadUInt32();
+    for (int i = 0; i < blockGroupCount; i++)
     {
-        var langId = reader.ReadUInt32();
-        var langItemCount = reader.ReadUInt32();
+        var groupId = reader.ReadUInt32();
+        var blockCount = reader.ReadUInt32();
 
-        for (int j = 0; j < langItemCount; j++)
+        for (int j = 0; j < blockCount; j++)
         {
+            // AssetBundles/blocks/{groupId}/{blockId}.blk
             var blockId = reader.ReadUInt32();
-            // AssetBundles/blocks/{langId}/{blockId}.blk
+            var magic = reader.ReadBytes(2); // 00 04 or 00 05
 
-            langDict.Add(blockId, langId);
-            // Console.WriteLine("langId {0} blockId {1}", langId, blockId);
+            // Console.WriteLine("groupId={0} blockId={1}", groupId, blockId);
+            blockGroups.Add(blockId, groupId);
         }
     }
 
-    return langDict;
+    return blockGroups;
 }
 
-static Dictionary<uint, BlockInfo> LoadAssets(BinaryReader reader, Dictionary<uint, uint> langDict)
+static Dictionary<uint, BlockInfo> LoadAssets(BinaryReader reader, Dictionary<uint, uint> blockGroupsDict)
 {
     var assets = new Dictionary<uint, BlockInfo>();
 
-    var blocksCount = reader.ReadUInt32();
-    Console.WriteLine("blocksCount: {0}", blocksCount);
+    var blockInfoCount = reader.ReadUInt32();
+    Console.WriteLine("blockInfoCount: {0}", blockInfoCount);
 
-    for (int i = 0; i < blocksCount; i++)
+    for (int i = 0; i < blockInfoCount; i++)
     {
         var blockId = reader.ReadUInt32(); // {blockId}.blk
-        var blockSize = reader.ReadUInt32();
+        var assetOffsetsCount = reader.ReadUInt32();
 
-        // Console.WriteLine("BlockId {0} Size {1}", blockId, blockSize);
+        // Console.WriteLine("blockId={0} assetOffsetsCount={1}", blockId, assetOffsetsCount);
 
-        for (int j = 0; j < blockSize; j++)
+        for (int j = 0; j < assetOffsetsCount; j++)
         {
             var assetId = reader.ReadUInt32();
             var offset = reader.ReadUInt32();
 
-            var blockInfo = new BlockInfo { Language = langDict.ContainsKey(blockId) ? langDict[blockId] : 0, Id = blockId, Offset = offset };
+            var blockInfo = new BlockInfo
+            {
+                Language = blockGroupsDict.ContainsKey(blockId) ? blockGroupsDict[blockId] : 0,
+                Id = blockId,
+                Offset = offset
+            };
             assets.Add(assetId, blockInfo);
-            // Console.WriteLine("AssetId {0} Offset {1}", assetId, offset);
+            // Console.WriteLine("blockId={0} assetId={1} offset={2}", blockId, assetId, offset);
         }
     }
 
