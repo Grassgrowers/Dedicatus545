@@ -1,4 +1,5 @@
 ﻿using System.Text;
+using System.Text.Encodings.Web;
 using System.Text.Json;
 using static AssetIndex;
 
@@ -58,7 +59,11 @@ static void LoadAssetIndex(string assetIndexPath, string mappedNamePath, string 
             SortList = sortList,
         };
 
-        var jsonString = JsonSerializer.Serialize(assetIndex, new JsonSerializerOptions { WriteIndented = true });
+        var jsonString = JsonSerializer.Serialize(assetIndex, new JsonSerializerOptions
+        {
+            Encoder = JavaScriptEncoder.UnsafeRelaxedJsonEscaping,
+            WriteIndented = true
+        });
         File.WriteAllText(targetPath, jsonString);
     }
 }
