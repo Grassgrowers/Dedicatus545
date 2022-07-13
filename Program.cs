@@ -4,9 +4,9 @@ using System.Text.Json;
 using static AssetIndex;
 
 // 31049740.blk
-var assetIndexPath = @"I:\git\YuanShen\asset-indexes\OSREL2.8.0\release_external_asset_index.bin";
-var mappedNamePath = @"I:\git\YuanShen\asset-indexes\OSREL2.8.0\mapped_name.json";
-var targetPath = @"I:\git\YuanShen\asset-indexes\OSREL2.8.0\GenshinImpact_2.8.0.zip_31049740.blk.asset_index.json";
+var assetIndexPath = @"I:\git\YuanShen\asset-indexes\OSCB2.8.50\release_external_asset_index.bin";
+var mappedNamePath = @"I:\git\YuanShen\asset-indexes\OSCB2.8.50\mapped_name.json";
+var targetPath = @"I:\git\YuanShen\asset-indexes\OSCB2.8.50\GenshinImpact_2.8.50_beta.zip_31049740.blk.asset_index.json";
 
 LoadAssetIndex(assetIndexPath, mappedNamePath, targetPath);
 
@@ -125,13 +125,13 @@ static Dictionary<uint, List<SubAssetInfo>> LoadSubAssets(BinaryReader reader, D
         // var hashInfo = new Dictionary<uint, string>() { { pathHashLast, "" } };
 
         // if (subAssetHashDict.ContainsKey(pathHashPre))
-        //    hashInfo = hashInfo.Concat(subAssetHashDict[pathHashPre]).ToDictionary(k => k.Key, v => v.Value);
+        //     hashInfo = hashInfo.Concat(subAssetHashDict[pathHashPre]).ToDictionary(k => k.Key, v => v.Value);
 
         // subAssetHashDict[pathHashPre] = hashInfo;
     }
 
     // var jsonString = JsonSerializer.Serialize(subAssetHashDict, new JsonSerializerOptions { WriteIndented = true });
-    // File.WriteAllText(@"I:\git\YuanShen\asset-indexes\OSREL2.8.0\unmapped_name.json", jsonString);
+    // File.WriteAllText(@"I:\git\YuanShen\asset-indexes\OSCB2.8.50\unmapped_name.json", jsonString);
 
     return subAssetDict;
 }
