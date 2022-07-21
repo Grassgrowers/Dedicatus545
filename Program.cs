@@ -1,12 +1,14 @@
-﻿using System.Text;
+﻿// #define EXPORT_UNMAPPED
+
+using System.Text;
 using System.Text.Encodings.Web;
 using System.Text.Json;
 using static AssetIndex;
 
 // 31049740.blk
-var assetIndexPath = @"I:\git\YuanShen\asset-indexes\OSCB2.8.50\release_external_asset_index.bin";
-var mappedNamePath = @"I:\git\YuanShen\asset-indexes\OSCB2.8.50\mapped_name.json";
-var targetPath = @"I:\git\YuanShen\asset-indexes\OSCB2.8.50\GenshinImpact_2.8.50_beta.zip_31049740.blk.asset_index.json";
+var assetIndexPath = @"I:\git\YuanShen\asset-indexes\CNCB2.8.51\release_external_asset_index.bin";
+var mappedNamePath = @"I:\git\YuanShen\asset-indexes\CNCB2.8.51\mapped_name.json";
+var targetPath = @"I:\git\YuanShen\asset-indexes\CNCB2.8.51\YuanShen_2.8.51_beta.zip_31049740.blk.asset_index.json";
 
 LoadAssetIndex(assetIndexPath, mappedNamePath, targetPath);
 
@@ -14,6 +16,7 @@ static void LoadAssetIndex(string assetIndexPath, string mappedNamePath, string 
 {
     var mappedName = new Dictionary<uint, Dictionary<uint, string>>();
 
+#if !EXPORT_UNMAPPED
     using (FileStream stream = File.OpenRead(mappedNamePath))
     {
         var bytes = new byte[stream.Length];
@@ -25,6 +28,7 @@ static void LoadAssetIndex(string assetIndexPath, string mappedNamePath, string 
         var jsonString = Encoding.UTF8.GetString(bytes);
         mappedName = JsonSerializer.Deserialize<Dictionary<uint, Dictionary<uint, string>>>(jsonString);
     }
+#endif
 
     var assetIndexStream = new FileStream(assetIndexPath, FileMode.Open);
 
@@ -39,11 +43,11 @@ static void LoadAssetIndex(string assetIndexPath, string mappedNamePath, string 
         var assetsDict = new Dictionary<uint, BlockInfo>();
         var sortList = new List<uint>();
 
-        typeDict = LoadTypes(reader);
+        typeDict = LoadAssetTypeNameMap(reader);
         subAssetDict = LoadSubAssets(reader, mappedName);
-        dependenciesDict = LoadDependencies(reader);
-        preloadBlocksList = LoadPreloadBlocks(reader);
-        preloadShaderBlocksList = LoadPreloadShaderBlocks(reader);
+        dependenciesDict = LoadBundleDependencyMap(reader);
+        preloadBlocksList = LoadPreloadBlockSet(reader);
+        preloadShaderBlocksList = LoadPreloadShaderBlockSet(reader);
         blockGroupsDict = LoadBlockGroups(reader);
         assetsDict = LoadAssets(reader, blockGroupsDict);
         sortList = LoadSortList(reader);
@@ -68,7 +72,7 @@ static void LoadAssetIndex(string assetIndexPath, string mappedNamePath, string 
     }
 }
 
-static Dictionary<string, string> LoadTypes(BinaryReader reader)
+static Dictionary<string, string> LoadAssetTypeNameMap(BinaryReader reader)
 {
     var typeDict = new Dictionary<string, string>();
 
@@ -90,7 +94,9 @@ static Dictionary<string, string> LoadTypes(BinaryReader reader)
 static Dictionary<uint, List<SubAssetInfo>> LoadSubAssets(BinaryReader reader, Dictionary<uint, Dictionary<uint, string>> mappedName)
 {
     var subAssetDict = new Dictionary<uint, List<SubAssetInfo>>();
-    // var subAssetHashDict = new Dictionary<uint, Dictionary<uint, string>>();
+#if EXPORT_UNMAPPED
+    var subAssetHashDict = new Dictionary<uint, Dictionary<uint, string>>();
+#endif
 
     var subAssetsCount = reader.ReadUInt32();
     Console.WriteLine("subAssetsCount: {0}", subAssetsCount);
@@ -122,21 +128,27 @@ static Dictionary<uint, List<SubAssetInfo>> LoadSubAssets(BinaryReader reader, D
         // Console.WriteLine("subAssetId={0} pathHashPre={1} pathHashLast={2}", subAssetId, pathHashPre, pathHashLast);
         subAssetDict[subAssetId] = subAssetList;
 
-        // var hashInfo = new Dictionary<uint, string>() { { pathHashLast, "" } };
+#if EXPORT_UNMAPPED
+        var hashInfo = new Dictionary<uint, string>() { { pathHashLast, "" } };
 
-        // if (subAssetHashDict.ContainsKey(pathHashPre))
-        //     hashInfo = hashInfo.Concat(subAssetHashDict[pathHashPre]).ToDictionary(k => k.Key, v => v.Value);
+        if (subAssetHashDict.ContainsKey(pathHashPre))
+            hashInfo = hashInfo.Concat(subAssetHashDict[pathHashPre]).ToDictionary(k => k.Key, v => v.Value);
 
-        // subAssetHashDict[pathHashPre] = hashInfo;
+        subAssetHashDict[pathHashPre] = hashInfo;
+#endif
     }
 
-    // var jsonString = JsonSerializer.Serialize(subAssetHashDict, new JsonSerializerOptions { WriteIndented = true });
-    // File.WriteAllText(@"I:\git\YuanShen\asset-indexes\OSCB2.8.50\unmapped_name.json", jsonString);
+#if EXPORT_UNMAPPED
+    var jsonString = JsonSerializer.Serialize(subAssetHashDict, new JsonSerializerOptions { WriteIndented = true });
+    File.WriteAllText(@"I:\git\YuanShen\asset-indexes\CNCB2.8.51\unmapped_name.json", jsonString);
+    Console.WriteLine("Exported!");
+    Environment.Exit(0);
+#endif
 
     return subAssetDict;
 }
 
-static Dictionary<uint, List<uint>> LoadDependencies(BinaryReader reader)
+static Dictionary<uint, List<uint>> LoadBundleDependencyMap(BinaryReader reader)
 {
     var dependenciesDict = new Dictionary<uint, List<uint>>();
 
@@ -159,7 +171,7 @@ static Dictionary<uint, List<uint>> LoadDependencies(BinaryReader reader)
     return dependenciesDict;
 }
 
-static List<uint> LoadPreloadBlocks(BinaryReader reader)
+static List<uint> LoadPreloadBlockSet(BinaryReader reader)
 {
     var preloadBlocks = new List<uint>();
 
@@ -174,7 +186,7 @@ static List<uint> LoadPreloadBlocks(BinaryReader reader)
     return preloadBlocks;
 }
 
-static List<uint> LoadPreloadShaderBlocks(BinaryReader reader)
+static List<uint> LoadPreloadShaderBlockSet(BinaryReader reader)
 {
     var preloadShaderBlocks = new List<uint>();
 
