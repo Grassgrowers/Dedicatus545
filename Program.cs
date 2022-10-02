@@ -6,9 +6,9 @@ using System.Text.Json;
 using static AssetIndex;
 
 // 31049740.blk
-var assetIndexPath = @"I:\git\YuanShen\asset-indexes\CNCB2.8.51\release_external_asset_index.bin";
-var mappedNamePath = @"I:\git\YuanShen\asset-indexes\CNCB2.8.51\mapped_name.json";
-var targetPath = @"I:\git\YuanShen\asset-indexes\CNCB2.8.51\YuanShen_2.8.51_beta.zip_31049740.blk.asset_index.json";
+var assetIndexPath = @"I:\git\YuanShen\asset-indexes\OSCB3.1.51\release_external_asset_index.bin";
+var mappedNamePath = @"I:\git\YuanShen\asset-indexes\OSCB3.1.51\mapped_name.json";
+var targetPath = @"I:\git\YuanShen\asset-indexes\OSCB3.1.51\GenshinImpact_3.1.51_beta.zip_31049740.blk.asset_index.json";
 
 LoadAssetIndex(assetIndexPath, mappedNamePath, targetPath);
 
@@ -140,7 +140,7 @@ static Dictionary<uint, List<SubAssetInfo>> LoadSubAssets(BinaryReader reader, D
 
 #if EXPORT_UNMAPPED
     var jsonString = JsonSerializer.Serialize(subAssetHashDict, new JsonSerializerOptions { WriteIndented = true });
-    File.WriteAllText(@"I:\git\YuanShen\asset-indexes\CNCB2.8.51\unmapped_name.json", jsonString);
+    File.WriteAllText(@"I:\git\YuanShen\asset-indexes\OSCB3.1.51\unmapped_name.json", jsonString);
     Console.WriteLine("Exported!");
     Environment.Exit(0);
 #endif
@@ -153,6 +153,7 @@ static Dictionary<uint, List<uint>> LoadBundleDependencyMap(BinaryReader reader)
     var dependenciesDict = new Dictionary<uint, List<uint>>();
 
     var dependenciesCount = reader.ReadUInt32();
+    reader.ReadUInt32(); // [magic] ver: 3.1.51
     Console.WriteLine("dependenciesCount: {0}", dependenciesCount);
 
     for (int i = 0; i < dependenciesCount; i++)
